@@ -1,0 +1,199 @@
+C51 COMPILER V7.06   TOUCH                                                                 03/22/2013 05:09:42 PAGE 1   
+
+
+C51 COMPILER V7.06, COMPILATION OF MODULE TOUCH
+OBJECT MODULE PLACED IN touch.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE touch.c LARGE OPTIMIZE(9,SPEED) BROWSE DEBUG OBJECTEXTEND
+
+stmt level    source
+
+   1          
+   2          
+   3          #include "touch.h"
+   4          
+   5          
+   6          //**********************************************************
+   7          void spistar()                                     //SPI开始
+   8          {
+   9   1              DCLK=0;
+  10   1              T_CS=1;
+  11   1              _nop_();_nop_();_nop_();
+  12   1              DIN=1;
+  13   1              DCLK=1;
+  14   1              _nop_();_nop_();_nop_(); 
+  15   1              T_CS=0;
+  16   1              _nop_();_nop_();_nop_();
+  17   1              _nop_();_nop_();_nop_();
+  18   1      
+  19   1      }
+  20          //**********************************************************
+  21          void WriteCharTo7843(unsigned char num)          //SPI写数据
+  22          {
+  23   1              unsigned char count=0;
+  24   1              DCLK=0;
+  25   1              for(count=0;count<8;count++)
+  26   1              {
+  27   2              num<<=1;
+  28   2              DIN=CY;
+  29   2              DCLK=0; _nop_();_nop_();_nop_();                //上升沿有效
+  30   2              DCLK=1; _nop_();_nop_();_nop_();
+  31   2              }
+  32   1      }
+  33          //**********************************************************
+  34          unsigned int ReadFromCharFrom7843()             //SPI 读数据
+  35          {
+  36   1              unsigned char count=0;
+  37   1              unsigned int Num=0;
+  38   1              for(count=0;count<12;count++)
+  39   1              {
+  40   2              Num<<=1;
+  41   2              DCLK=1; _nop_();_nop_();_nop_();                //下降沿有效
+  42   2              DCLK=0; _nop_();_nop_();_nop_();
+  43   2              if(DOUT) Num++;
+  44   2              }
+  45   1              return(Num);
+  46   1      }
+  47          
+  48          
+  49          void inttostr(int dd,unsigned char *str)
+  50          {
+  51   1              str[0]=dd/10000+48;         //个位  48的意思是，触摸IC是12位的AD， 加48是向高位移4位，取高12位的数据
+  52   1              str[1]=(dd/1000)-((dd/10000)*10)+48; //十位
+  53   1              str[2]=(dd/100)-((dd/1000)*10)+48;      //百位
+  54   1              str[3]=(dd/10)-((dd/100)*10)+48; //千位
+  55   1              str[4]=dd-((dd/10)*10)+48; //万位
+C51 COMPILER V7.06   TOUCH                                                                 03/22/2013 05:09:42 PAGE 2   
+
+  56   1              str[5]=0;
+  57   1      }
+  58          u16 AD7843(u8 CMD)              //外部中断0 用来接受键盘发来的数据
+  59          {
+  60   1              u16 AD_Data;
+  61   1              //delayms(1);                     //中断后延时以消除抖动，使得采样数据更准确
+  62   1              spistar();                       //启动SPI
+  63   1              //while(BUSY);                //如果BUSY信号不好使可以删除不用
+  64   1              //delayms(1);
+  65   1              WriteCharTo7843(CMD);        //送控制字 10010000 即用差分方式读X坐标 详细请见有关资料
+  66   1              //while(BUSY);               //如果BUSY信号不好使可以删除不用
+  67   1              //delayms(1);
+  68   1              DCLK=1; _nop_();_nop_();_nop_();_nop_();
+  69   1              DCLK=0; _nop_();_nop_();_nop_();_nop_();
+  70   1              AD_Data =ReadFromCharFrom7843();
+  71   1              //WriteCharTo7843(0xD0);       //送控制字 11010000 即用差分方式读Y坐标 详细请见有关资料
+  72   1              //DCLK=1; _nop_();_nop_();_nop_();_nop_();
+  73   1              //DCLK=0; _nop_();_nop_();_nop_();_nop_();
+  74   1              //TP_X=ReadFromCharFrom7843();
+  75   1              _nop_();_nop_();_nop_(); 
+  76   1              _nop_();_nop_();_nop_(); 
+  77   1              _nop_();_nop_();_nop_(); 
+  78   1              _nop_();_nop_();_nop_(); 
+  79   1              T_CS=1;
+  80   1              
+  81   1              return  AD_Data ;
+  82   1      }
+  83          
+  84          //读取一个坐标值
+  85          //连续读取READ_TIMES次数据,对这些数据升序排列,
+  86          //然后去掉最低和最高LOST_VAL个数,取平均值 
+  87          
+  88          unsigned int ADS_Read_XY(u8 xy)
+  89          {
+  90   1              u16 xdata i, j;
+  91   1              u16 xdata buf[READ_TIMES];
+  92   1              u16 sum=0;
+  93   1              u16 temp;
+  94   1              for(i=0;i<READ_TIMES;i++)
+  95   1              {                                
+  96   2                      buf[i]=AD7843(xy);          
+  97   2              }                                   
+  98   1              for(i=0;i<READ_TIMES-1; i++)//排序
+  99   1              {
+ 100   2                      for(j=i+1;j<READ_TIMES;j++)
+ 101   2                      {
+ 102   3                              if(buf
+ 103   3                              [i]>buf[j])//升序排列
+ 104   3                              {
+ 105   4                                      temp=buf[i];
+ 106   4                                      buf[i]=buf[j];
+ 107   4                                      buf[j]=temp;
+ 108   4                              }
+ 109   3                      }
+ 110   2              }         
+ 111   1              sum=0;
+ 112   1              for(i=LOST_VAL;i<READ_TIMES-LOST_VAL;i++)sum+=buf[i];
+ 113   1              temp=sum/(READ_TIMES-2*LOST_VAL);
+ 114   1              return temp;   
+ 115   1      } 
+ 116          
+ 117          
+C51 COMPILER V7.06   TOUCH                                                                 03/22/2013 05:09:42 PAGE 3   
+
+ 118          //2次读取ADS7846,连续读取2次有效的AD值,且这两次的偏差不能超过
+ 119          //50,满足条件,则认为读数正确,否则读数错误.         
+ 120          //该函数能大大提高准确度
+ 121          
+ 122          unsigned char Read_ADS2(u16 *x,u16 *y) 
+ 123          {
+ 124   1          u16 xdata  x1,y1;
+ 125   1          u16 xdata x2,y2;
+ 126   1          u8 xdata flag;    
+ 127   1          flag=Read_ADS(&x1,&y1);   
+ 128   1          if(flag==0)return(0);
+ 129   1          flag=Read_ADS(&x2,&y2);        
+ 130   1          if(flag==0)return(0);   
+ 131   1          if(((x2<=x1&&x1<x2+ERR_RANGE)||(x1<=x2&&x2<x1+ERR_RANGE))//前后两次采样在+-50内
+ 132   1          &&((y2<=y1&&y1<y2+ERR_RANGE)||(y1<=y2&&y2<y1+ERR_RANGE)))
+ 133   1          {
+ 134   2              *x=(x1+x2)/2;
+ 135   2              *y=(y1+y2)/2;
+ 136   2              return 1;
+ 137   2          }else return 0;       
+ 138   1      } 
+ 139          
+ 140          
+ 141          //带滤波的坐标读取
+ 142          //最小值不能少于100.
+ 143          unsigned char Read_ADS(u16 *x,u16 *y)
+ 144          {
+ 145   1              u16 xdata xtemp,ytemp;                                            
+ 146   1              xtemp=ADS_Read_XY(CMD_RDX);
+ 147   1              ytemp=ADS_Read_XY(CMD_RDY);                                                                                                        
+ 148   1              if(xtemp<100||ytemp<100)return 0;//读数失败
+ 149   1              *x=xtemp;
+ 150   1              *y=ytemp;
+ 151   1              return 1;//读数成功
+ 152   1      }
+ 153          
+ 154          //返回坐标的整数值
+ 155          void Get_touch_coor(u16 *xx,u16 *yy)
+ 156          {
+ 157   1              u16 Xdata,Ydata;
+ 158   1              unsigned long i;
+ 159   1              Read_ADS2(&Xdata,&Ydata);
+ 160   1              i=Xdata;
+ 161   1              i=i*240;
+ 162   1              *xx=i/3830;
+ 163   1              if(*xx>240) *xx=240;
+ 164   1              i=Ydata;
+ 165   1              i=i*320;
+ 166   1              *yy=i/3804;
+ 167   1              if(*yy>320) *yy=320;
+ 168   1              if(*yy<=320) *yy=320- *yy;
+ 169   1      }
+ 170          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1129    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----      71
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+C51 COMPILER V7.06   TOUCH                                                                 03/22/2013 05:09:42 PAGE 4   
+
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
